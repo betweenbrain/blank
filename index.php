@@ -29,6 +29,11 @@ if ( have_posts() ) :
 	endwhile;
 endif;
 ?>
+<?php
+/**
+ * Render Google Map of all locations
+ */
+?>
 <div id="map"></div>
 <?php
 $key     = get_option( 'google_maps_api_key' );
@@ -46,10 +51,9 @@ foreach ( $terms as $term ) {
 ?>
 	<style>
 		#map {
-			height: 800px;
+			height: 600px;
 			margin: 0 auto;
-			width: 800px
-		}
+			width: 600px		}
 	</style>
 	<script>
 		const markers = <?php echo json_encode($markers) ?>;
