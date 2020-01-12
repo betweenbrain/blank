@@ -31,6 +31,44 @@ endif;
 ?>
 <?php
 /**
+ * Show today's program if any.
+ */
+$today = date( 'Y-m-d' );
+$query = new WP_Query(
+	array(
+		'post_type'      => 'activity',
+		'posts_per_page' => '50',
+		'paged'          => '1',
+		'order'          => 'ASC',
+		'orderby'        => 'meta_value',
+		'meta_key'       => 'begin',
+		'meta_type'      => 'DATETIME',
+		'meta_compare'   => '>',
+		'meta_value'     => $today,
+	)
+);
+
+
+if ( $query->have_posts() ) :
+?>
+<div>
+	<h1>Today's Fair Program - <?php echo date( 'l, F jS', strtotime( $today ) ); ?></h1>
+	<?php
+	foreach ( $query->posts as $post ) :
+		?>
+	<section class="event-day">
+		<ol>
+			<?php echo $post->post_title; ?>
+		</ol>
+	</section>
+	<?php endforeach; ?>
+</div>
+<?php
+endif;
+wp_reset_postdata();
+?>
+<?php
+/**
  * Render Google Map of all locations
  */
 ?>
@@ -56,7 +94,7 @@ foreach ( $terms as $term ) {
 			width: 600px		}
 	</style>
 	<script>
-		const markers = <?php echo json_encode($markers) ?>;
+		const markers = <?php echo json_encode( $markers ); ?>;
 
 		function initMap() {
 			const map = new google.maps.Map(document.getElementById('map'), {
