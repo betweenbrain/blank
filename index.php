@@ -31,7 +31,16 @@ endif;
 ?>
 <?php
 /**
- * Show today's program if any.
+ * Render Google Map of today's program.
+ */
+?>
+<div id="map"></div>
+<?php
+$key     = get_option( 'google_maps_api_key' );
+$markers = array();
+
+/**
+ * Get future activities.
  */
 $today = date( 'Y-m-d' );
 $query = new WP_Query(
@@ -48,43 +57,23 @@ $query = new WP_Query(
 	)
 );
 
-
-if ( $query->have_posts() ) :
-?>
-<div>
-	<h1>Today's Fair Program - <?php echo date( 'l, F jS', strtotime( $today ) ); ?></h1>
-	<?php
-	foreach ( $query->posts as $post ) :
-		?>
-	<section class="event-day">
-		<ol>
-			<?php echo $post->post_title; ?>
-		</ol>
-	</section>
-	<?php endforeach; ?>
-</div>
-<?php
-endif;
-wp_reset_postdata();
-?>
-<?php
 /**
- * Render Google Map of all locations
+ * Get each activity location.
  */
-?>
-<div id="map"></div>
-<?php
-$key     = get_option( 'google_maps_api_key' );
-$markers = array();
-$terms   = get_terms(
-	array(
-		'taxonomy'   => 'location',
-		'hide_empty' => false,
-	)
-);
-foreach ( $terms as $term ) {
-	$location  = get_term_meta( $term->term_id, 'latLng', true );
-	$markers[] = esc_attr( $location );
+foreach ( $query->posts as $post ) {
+	$location = wp_get_post_terms( $post->ID, array( 'location' ) )[0];
+	$meta     = get_post_meta( $post->ID );
+	$begin    = array_key_exists( 'begin', $meta ) ? $meta['begin'][0] : null;
+	$end      = array_key_exists( 'end', $meta ) ? $meta['end'][0] : null;
+	$latLng   = get_term_meta( $location->term_id, 'latLng', true );
+
+	$markers[] = array(
+		'begin'    => $begin,
+		'end'      => $end,
+		'latLng'   => $latLng,
+		'location' => $location->name,
+		'name'     => $post->post_title,
+	);
 }
 ?>
 	<style>
@@ -102,15 +91,28 @@ foreach ( $terms as $term ) {
 				zoom: 17
 			});
 
-			/* Render saved marker */ 
+			/* Render saved markers */ 
 			if(markers){
 				markers.forEach(elem => {
-					const cords = elem.replace('(', '').replace(')', '').split(',');
+					const contentString = `<h1>${elem['name']}</h1>
+					<p>From ${elem['begin']} at the ${elem['location']}</p>`;
+					
+					const cords = elem['latLng'].replace('(', '').replace(')', '').split(',');
+					const infowindow = new google.maps.InfoWindow({
+						content: contentString
+					  });
 					const position = new google.maps.LatLng(cords[0], cords[1]);
-					new google.maps.Marker({
+					
+					const marker = new google.maps.Marker({
+						animation: google.maps.Animation.DROP,
+						map,
 						position,
-						map
+						title: elem['name']
 					});
+
+					marker.addListener('click', function() {
+						infowindow.open(map, marker);
+					  });
 				})
 			}
 		}
