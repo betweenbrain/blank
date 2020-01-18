@@ -29,6 +29,7 @@ if ( have_posts() ) :
 	endwhile;
 endif;
 ?>
+
 <?php
 /**
  * Render Google Map of today's program.
@@ -50,10 +51,16 @@ $query = new WP_Query(
 		'paged'          => '1',
 		'order'          => 'ASC',
 		'orderby'        => 'meta_value',
-		'meta_key'       => 'begin',
-		'meta_type'      => 'DATETIME',
-		'meta_compare'   => '>',
-		'meta_value'     => $today,
+		'meta_query'     => array(
+			array(
+				// meta key like comparison
+				'compare_key' => 'LIKE',
+				'key'         => 'begin',
+				'value'       => $today,
+				'compare'     => '>',
+				'type'        => 'DATETIME',
+			),
+		),
 	)
 );
 
@@ -63,16 +70,33 @@ $query = new WP_Query(
 foreach ( $query->posts as $post ) {
 	$location = wp_get_post_terms( $post->ID, array( 'location' ) )[0];
 	$meta     = get_post_meta( $post->ID );
-	$begin    = array_key_exists( 'begin', $meta ) ? $meta['begin'][0] : null;
-	$end      = array_key_exists( 'end', $meta ) ? $meta['end'][0] : null;
 	$latLng   = get_term_meta( $location->term_id, 'latLng', true );
 
+	$occurrence = [];
+	foreach ( $meta as $key => $value ) {
+		// Check if this field is part of a datetime set.
+		if ( strpos( $key, 'begin' ) || strpos( $key, 'end' ) ) {
+			$parts = explode( '_', $key );
+			// Initialize empty string for this occurrence.
+			if ( ! array_key_exists( $parts[0], $occurrence ) ) {
+				$occurrence[ $parts[0] ] = '';
+			}
+
+			if ( strpos( $key, 'begin' )) {
+				$occurrence[ $parts[0] ] .= "From {$value[0]}";
+			}
+
+			if(strpos( $key, 'end' )){
+				$occurrence[ $parts[0] ] .= " until {$value[0]}";
+			}
+		}
+	}
+
 	$markers[] = array(
-		'begin'    => $begin,
-		'end'      => $end,
-		'latLng'   => $latLng,
-		'location' => $location->name,
-		'name'     => $post->post_title,
+		'occurrence' => $occurrence,
+		'latLng'     => $latLng,
+		'location'   => $location->name,
+		'name'       => $post->post_title,
 	);
 }
 ?>
@@ -94,8 +118,12 @@ foreach ( $query->posts as $post ) {
 			/* Render saved markers */ 
 			if(markers){
 				markers.forEach(elem => {
-					const contentString = `<h1>${elem['name']}</h1>
-					<p>From ${elem['begin']} at the ${elem['location']}</p>`;
+					let contentString = `<h1>${elem['name']}</h1>
+					<p>At the ${elem['location']}</p>`;
+
+					elem.occurrence.forEach(span => {
+						contentString += `<p>${span}</p>`;
+					})
 					
 					const cords = elem['latLng'].replace('(', '').replace(')', '').split(',');
 					const infowindow = new google.maps.InfoWindow({
